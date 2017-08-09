@@ -100,7 +100,9 @@ template(name="SyslogForwarderTemplate" type="list") {
     ca_cert_path = '/etc/ssl/certs/ca-certificates.crt'
 
     if_p('syslog.ca_cert') do
-      ca_cert_path = '/var/vcap/jobs/syslog_forwarder/config/ca_cert.pem'
+      unless p('syslog.ca_cert').strip.empty?
+        ca_cert_path = '/var/vcap/jobs/syslog_forwarder/config/ca_cert.pem'
+      end
     end
   %>
 

@@ -65,6 +65,27 @@ RSpec.describe 'syslog_forwarder rsyslog.conf' do
       BoshTemplate.render(template_path, job_name, manifest, links)
     }.to raise_error(RuntimeError, "unknown syslog.migration.message_format: crazy-format")
   end
+
+  it 'uses the default ca_cert path when ca_cert is not configured' do
+    manifest = generate_manifest_tls(minimum_manifest)
+    actual_template = BoshTemplate.render(template_path, job_name, manifest, links)
+    default_ca_cert_config = "$DefaultNetstreamDriverCAFile /etc/ssl/certs/ca-certificates.crt"
+    expect(actual_template).to include default_ca_cert_config
+  end
+
+  it 'uses the default ca_cert path when ca_cert is empty' do
+    manifest = generate_manifest_tls(minimum_manifest, '')
+    actual_template = BoshTemplate.render(template_path, job_name, manifest, links)
+    default_ca_cert_config = "$DefaultNetstreamDriverCAFile /etc/ssl/certs/ca-certificates.crt"
+    expect(actual_template).to include default_ca_cert_config
+  end
+
+  it 'uses the custom ca_cert path when ca_cert is configured' do
+    manifest = generate_manifest_tls(minimum_manifest, '---ca_cert---')
+    actual_template = BoshTemplate.render(template_path, job_name, manifest, links)
+    default_ca_cert_config = "$DefaultNetstreamDriverCAFile /var/vcap/jobs/syslog_forwarder/config/ca_cert.pem"
+    expect(actual_template).to include default_ca_cert_config
+  end
 end
 
 def generate_manifest(raw_manifest)
@@ -75,12 +96,31 @@ end
 
 def generate_manifest_with_message_format(raw_manifest, message_format)
   generate_manifest(raw_manifest) do |manifest|
-    manifest['instance_groups'][0]['jobs'][0]['properties'] = {
+    set_syslog_properties(manifest, {
       'syslog' => {
         'migration' => {
           'message_format' => message_format
         }
       }
-    }
+    })
   end
+end
+
+def generate_manifest_tls(raw_manifest, custom_ca_cert=nil)
+  generate_manifest(raw_manifest) do |manifest|
+    properties = {
+      'syslog' => {
+        'tls_enabled' => true
+      }
+    }
+    unless custom_ca_cert.nil?
+      properties['syslog']['ca_cert'] = custom_ca_cert
+    end
+
+    set_syslog_properties(manifest, properties)
+  end
+end
+
+def set_syslog_properties(manifest, properties)
+  manifest['instance_groups'][0]['jobs'][0]['properties'] = properties
 end
